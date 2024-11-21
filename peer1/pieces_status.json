@@ -2,5 +2,9 @@
     "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225": {
       "file_name": "Sample.txt",
       "pieces_status": [1, 1, 1, 0, 0]
+    },
+    "c775e7b757ede630cd0aa1113bd102661ab38829ca52a6422ab782862f268646": {
+      "file_name": "Sample1.txt",
+      "pieces_status": [0, 0, 0, 1, 1]
     }
 }

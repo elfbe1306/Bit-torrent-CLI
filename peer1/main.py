@@ -17,21 +17,21 @@ FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
 PIECE_SIZE = 2
 
-uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
+# uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
+uri = "mongodb+srv://elfbe:elfbe123@cluster0.gnhrfvo.mongodb.net/"
 try:
     client = MongoClient(uri)
     print("Connected successfully!")
     
     db = client["mydatabase"]
     collection = db["mycollection"]
-
-    # document = {"name": "Alice", "age": 25, "city": "New York"}
-    # result = collection.insert_one(document)
-    # print(f"Inserted document ID: {result.inserted_id}")
+    
 except Exception as e:
     print("Error:", e)
-finally:
-    client.close()
+    client = None  # Mark the client as None to handle errors gracefully later
+
+# Do not close the client here. Keep it open for the lifetime of the program.
+# Remove the `finally` block entirely.
 
 def start_peer_server(peer_ip = "127.0.0.1", peer_port = "4001"):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
