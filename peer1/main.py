@@ -51,7 +51,33 @@ def handle_request(client_socket):
         data = client_socket.recv(4096).decode(FORMAT)
         request = json.loads(data)
         
-        if(request['type'] == 'GET_FILE_STATUS'):
+        if request['type'] == 'UPDATE_PIECES_STATUS':
+            info_hash = request['info_hash']
+            pieces_status = request['pieces_status']
+
+            # Update `pieces_status.json`
+            try:
+                with open('pieces_status.json', 'r') as f:
+                    file_status_data = json.load(f)
+            except FileNotFoundError:
+                file_status_data = {}
+
+            if not file_status_data.get(info_hash):
+                file_status_data[info_hash] = {}
+
+            if 'file_name' not in file_status_data[info_hash]:
+                # If `file_name` is missing, fetch from DB or request sender to provide it
+                file_name = collection.find_one({"hashinfo": info_hash}).get("file_name", "Unknown")
+                file_status_data[info_hash]['file_name'] = file_name
+
+            file_status_data[info_hash]['pieces_status'] = pieces_status
+
+            with open('pieces_status.json', 'w') as f:
+                json.dump(file_status_data, f, indent=4)
+
+            client_socket.sendall("OK".encode(FORMAT))
+            
+        elif(request['type'] == 'GET_FILE_STATUS'):
             info_hash = request['info_hash']
             
             response = {
@@ -177,6 +203,73 @@ def fetch(infohash):
         print(table)
     else:
         print(f"No entries found for infohash: {infohash}")
+        
+def assign_piece_status_to_peers(info_hash, num_of_pieces, peers_keep_file, file_name):
+    """
+    Dynamically assign pieces_status to peers via socket connections and include the file_name.
+    """
+    peer_chunk_map = {i: [] for i in range(num_of_pieces)}  # Map chunks to peers
+
+    # Distribute chunks to peers
+    for i, (peer_ip, peer_port) in enumerate(peers_keep_file):
+        for j in range(i, num_of_pieces, len(peers_keep_file)):
+            peer_chunk_map[j].append((peer_ip, peer_port))
+
+    # Connect to peers and update their pieces_status
+    for peer_ip, peer_port in peers_keep_file:
+        pieces_status = [0] * num_of_pieces
+
+        # Determine the chunks assigned to this peer
+        for chunk_index, peers in peer_chunk_map.items():
+            if (peer_ip, peer_port) in peers:
+                pieces_status[chunk_index] = 1
+
+        # Prepare request for peer
+        request = {
+            'type': 'UPDATE_PIECES_STATUS',
+            'info_hash': info_hash,
+            'pieces_status': pieces_status
+        }
+
+        # Connect to peer via socket and send the pieces_status
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((peer_ip, int(peer_port)))
+                s.sendall(json.dumps(request).encode(FORMAT))
+                response = s.recv(1024).decode(FORMAT)
+                if response == "OK":
+                    print(f"Updated pieces_status for peer {peer_ip}:{peer_port}")
+                else:
+                    print(f"Failed to update pieces_status for peer {peer_ip}:{peer_port}")
+        except (socket.error, ConnectionRefusedError, TimeoutError) as e:
+            print(f"Connection error with peer {peer_ip}:{peer_port}: {e}")
+
+    # Save the updated `pieces_status` and `file_name` to `pieces_status.json`
+    try:
+        with open('pieces_status.json', 'r') as f:
+            file_status_data = json.load(f)
+    except FileNotFoundError:
+        file_status_data = {}
+
+    if info_hash not in file_status_data:
+        file_status_data[info_hash] = {
+            'file_name': file_name,
+            'pieces_status': [0] * num_of_pieces
+        }
+
+    # Update the pieces_status for this info_hash
+    for peer_ip, peer_port in peers_keep_file:
+        pieces_status = [0] * num_of_pieces
+        for chunk_index, peers in peer_chunk_map.items():
+            if (peer_ip, peer_port) in peers:
+                pieces_status[chunk_index] = 1
+
+        file_status_data[info_hash]['pieces_status'] = pieces_status
+
+    with open('pieces_status.json', 'w') as f:
+        json.dump(file_status_data, f, indent=4)
+
+    print("Pieces status and file name assigned and saved to pieces_status.json.")
 
 def connect_to_peer_and_get_file_status(peer_ip, peer_port, info_hash):
     try:
@@ -247,6 +340,8 @@ def download(info_hash):
     file_path = f"storage/{file_name}"
     
     num_of_pieces = math.ceil(file_size / int(PIECE_SIZE))
+    
+    assign_piece_status_to_peers(info_hash, num_of_pieces, peers_keep_file, file_name)
     
     if not os.path.exists(file_path):
         with open(file_path, "wb") as f:

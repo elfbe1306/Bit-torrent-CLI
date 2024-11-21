@@ -12,7 +12,7 @@ import random
 from pymongo import MongoClient
 
 HOST = socket.gethostbyname(socket.gethostname())
-PORT = 4002
+PORT = 4003
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
 PIECE_SIZE = 2
