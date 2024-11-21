@@ -3,28 +3,7 @@
         "hashinfo": "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225",
         "file_name": "Sample.txt",
         "file_size": 9,
-        "peer_ip": "127.0.0.1",
+        "peer_ip": "10.128.33.144",
         "peer_port": 4000
-    },
-    {
-        "hashinfo": "c775e7b757ede630cd0aa1113bd102661ab38829ca52a6422ab782862f268646",
-        "file_name": "Sample1.txt",
-        "file_size": 10,
-        "peer_ip": "127.0.0.1",
-        "peer_port": 4000
-    },
-    {
-        "hashinfo": "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225",
-        "file_name": "Sample.txt",
-        "file_size": 9,
-        "peer_ip": "127.0.0.1",
-        "peer_port": 4001
-    },
-    {
-        "hashinfo": "c775e7b757ede630cd0aa1113bd102661ab38829ca52a6422ab782862f268646",
-        "file_name": "Sample1.txt",
-        "file_size": 10,
-        "peer_ip": "127.0.0.1",
-        "peer_port": 4001
     }
 ]

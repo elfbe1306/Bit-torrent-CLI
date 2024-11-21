@@ -4,11 +4,12 @@ from prettytable import PrettyTable
 import json
 import os
 import time
+from pymongo import MongoClient
 
-HOST = '127.0.0.1'
+HOST = socket.gethostbyname(socket.gethostname())
 PORT = 5000
 
-def start_peer_server(peer_ip='127.0.0.1', peer_port=5000):
+def start_peer_server(peer_ip=socket.gethostbyname(socket.gethostname()), peer_port=5000):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((peer_ip, peer_port))
         server_socket.listen(5)
@@ -60,31 +61,50 @@ def ping_client(peer_ip, peer_port):
         print('Client is not working')
 
 def get_peers_keep_file(info_hash):
-    database_path = 'tracker_server_database.json'
-    tracker_server_database_data = []
+    """
+    Fetches peer details for a specific info_hash from MongoDB and displays the information in a table format.
+    """
+    # MongoDB connection URI
+    uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
     
-    if os.path.exists(database_path):
-        try:
-            with open(database_path, 'r') as f:
-                tracker_server_database_data = json.load(f)  # Load all JSON data
-        except json.JSONDecodeError:
-            print("Error: The JSON file is not properly formatted.")
-        except Exception as e:
-            print(f"Error reading the JSON file: {e}")
-    
-    table = PrettyTable()
-    table.field_names = ["Hash Info", "File Name","File Size", "Peer IP", "Peer Port"]
+    try:
+        # Connect to MongoDB
+        client = MongoClient(uri)
+        print("Connected successfully!")
+        
+        # Access the database and collection
+        db = client["mydatabase"]
+        collection = db["mycollection"]
 
-    found_matched_hash_info = False
-    for entry in tracker_server_database_data:
-        if(entry.get("hashinfo") == info_hash):
+        # Query MongoDB for documents matching the info_hash
+        tracker_server_database_data = list(collection.find({"hashinfo": info_hash}))
+
+        # Prepare a table to display results
+        table = PrettyTable()
+        table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
+
+        found_matched_hash_info = False
+
+        for entry in tracker_server_database_data:
             found_matched_hash_info = True
-            table.add_row([entry["hashinfo"], entry["file_name"], entry["file_size"], entry["peer_ip"], entry["peer_port"]])
-    
-    if found_matched_hash_info:
-        print(table)
-    else:
-        print(f"No entries found for infohash: {info_hash}")
+            table.add_row([
+                entry.get("hashinfo", "N/A"),
+                entry.get("file_name", "N/A"),
+                entry.get("file_size", "N/A"),
+                entry.get("peer_ip", "N/A"),
+                entry.get("peer_port", "N/A")
+            ])
+
+        if found_matched_hash_info:
+            print(table)
+        else:
+            print(f"No entries found for infohash: {info_hash}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        # Close the MongoDB connection
+        client.close()
 
 def process_input(cmd):
     params = cmd.split()

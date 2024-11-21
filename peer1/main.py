@@ -9,14 +9,31 @@ import math
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 import random
+from pymongo import MongoClient
 
-HOST = '127.0.0.1'
+HOST = socket.gethostbyname(socket.gethostname())
 PORT = 4000
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
 PIECE_SIZE = 2
 
-def start_peer_server(peer_ip = "127.0.0.1", peer_port = "4000"):
+uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
+try:
+    client = MongoClient(uri)
+    print("Connected successfully!")
+    
+    db = client["mydatabase"]
+    collection = db["mycollection"]
+
+    # document = {"name": "Alice", "age": 25, "city": "New York"}
+    # result = collection.insert_one(document)
+    # print(f"Inserted document ID: {result.inserted_id}")
+except Exception as e:
+    print("Error:", e)
+finally:
+    client.close()
+
+def start_peer_server(peer_ip = "127.0.0.1", peer_port = "4001"):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((peer_ip, peer_port))
         server_socket.listen(5)
@@ -100,19 +117,23 @@ def handle_request(client_socket):
             client_socket.sendall(json.dumps(response).encode('utf-8'))
 
 def publish(file_path):
+    print(file_path)
     try:
         with open(file_path, 'rb') as file:
-            content = file.read(65536) 
+            content = file.read(65536)  # Read only the first 64KB of the file
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return
 
+    # Calculate hash
     hash_func = hashlib.sha256()
     hash_func.update(content)
 
+    # Get file details
     file_name = os.path.basename(file_path)
     file_size = os.path.getsize(file_path)
 
+    # Prepare the data to save in MongoDB
     new_data = {
         "hashinfo": hash_func.hexdigest(),
         "file_name": file_name,
@@ -121,57 +142,38 @@ def publish(file_path):
         "peer_port": PORT
     }
 
-    database_path = '../tracker_server_database.json'
+    # Check if a document with the same hashinfo and peer_port exists
+    query = {"hashinfo": new_data["hashinfo"], "peer_port": new_data["peer_port"]}
+    existing_doc = collection.find_one(query)
 
-    existing_data = []
-
-    if os.path.exists(database_path):
-        try:
-            with open(database_path, 'r') as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    existing_data = data
-                else:
-                    print("There are no data in JSON file. Overwriting with a new list.")
-        except json.JSONDecodeError:
-            print("Error reading the JSON file. Overwriting with a new list.")
-
-    for i, entry in enumerate(existing_data):
-        if entry.get("hashinfo") == new_data["hashinfo"] and entry.get("peer_port") == new_data["peer_port"]:
-            existing_data[i] = new_data 
-            break
+    if existing_doc:
+        # Update the existing document
+        result = collection.update_one(query, {"$set": new_data})
+        print(f"Updated existing document for file: {file_name}")
     else:
-        existing_data.append(new_data)
-
-    with open(database_path, 'w') as f:
-        json.dump(existing_data, f, indent=4)
+        # Insert a new document
+        result = collection.insert_one(new_data)
+        print(f"Inserted new document for file: {file_name} with ID: {result.inserted_id}")
 
     print("Publish file successfully")
 
 
 def fetch(infohash):
-    database_path = '../tracker_server_database.json'
-    tracker_server_database_data = []
-    
-    if os.path.exists(database_path):
-        try:
-            with open(database_path, 'r') as f:
-                tracker_server_database_data = json.load(f)
-        except json.JSONDecodeError:
-            print("Error: The JSON file is not properly formatted.")
-        except Exception as e:
-            print(f"Error reading the JSON file: {e}")
-    
-    table = PrettyTable()
-    table.field_names = ["Hash Info", "File Name","File Size", "Peer IP", "Peer Port"]
+    tracker_server_database_data = list(collection.find({"hashinfo": infohash}))
 
-    found_matched_hash_info = False
-    for entry in tracker_server_database_data:
-        if(entry.get("hashinfo") == infohash):
-            found_matched_hash_info = True
-            table.add_row([entry["hashinfo"], entry["file_name"], entry["file_size"], entry["peer_ip"], entry["peer_port"]])
-    
-    if found_matched_hash_info:
+    # Initialize PrettyTable
+    table = PrettyTable()
+    table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
+
+    if tracker_server_database_data:
+        for entry in tracker_server_database_data:
+            table.add_row([
+                entry.get("hashinfo", "N/A"),
+                entry.get("file_name", "N/A"),
+                entry.get("file_size", "N/A"),
+                entry.get("peer_ip", "N/A"),
+                entry.get("peer_port", "N/A")
+            ])
         print(table)
     else:
         print(f"No entries found for infohash: {infohash}")
@@ -229,23 +231,18 @@ def connect_to_peer_and_download_file_chunk(peer_ip, peer_port, info_hash, chunk
             print("Has been received invalid response from peer")
 
 def download(info_hash):
-    database_path = '../tracker_server_database.json'
     peers_keep_file = []
     file_name = None
     file_size = None
 
-    try:
-        with open(database_path, 'r') as f:
-            data = json.load(f)
+    data = list(collection.find({"hashinfo": info_hash}))
 
-        for entry in data:
-            if entry['hashinfo'] == info_hash:
-                peers_keep_file.append((entry['peer_ip'], entry['peer_port']))
-                if not file_name:
-                    file_name = entry["file_name"]
-                    file_size = entry["file_size"]
-    except FileNotFoundError:
-        print("Database not found.")
+    # Process the results
+    for entry in data:
+        peers_keep_file.append((entry.get("peer_ip", "N/A"), entry.get("peer_port", "N/A")))
+        if not file_name:
+            file_name = entry.get("file_name", None)
+            file_size = entry.get("file_size", None)
     
     file_path = f"storage/{file_name}"
     
