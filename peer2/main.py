@@ -375,7 +375,9 @@ def process_input(cmd):
     elif(params[0] == 'fetch'):
         fetch(params[1])
     elif(params[0] == 'download'):
-        download(params[1])
+        info_hashes = params[1:]  # Accept multiple hashes
+        for info_hash in info_hashes:
+            download(info_hash)
 
 if __name__ == "__main__":
     server_thread = threading.Thread(target=start_peer_server, args=(HOST, PORT))
