@@ -102,7 +102,7 @@ def handle_request(client_socket):
 def publish(file_path):
     try:
         with open(file_path, 'rb') as file:
-            content = file.read(65536)  # Read 64 KB
+            content = file.read(65536) 
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return
@@ -113,7 +113,6 @@ def publish(file_path):
     file_name = os.path.basename(file_path)
     file_size = os.path.getsize(file_path)
 
-    # Prepare new data to be added
     new_data = {
         "hashinfo": hash_func.hexdigest(),
         "file_name": file_name,
@@ -122,18 +121,14 @@ def publish(file_path):
         "peer_port": PORT
     }
 
-    # File path for the database
     database_path = '../tracker_server_database.json'
 
-    # Initialize existing data
     existing_data = []
 
-    # Read the existing data from the JSON file
     if os.path.exists(database_path):
         try:
             with open(database_path, 'r') as f:
                 data = json.load(f)
-                # Ensure data is a list
                 if isinstance(data, list):
                     existing_data = data
                 else:
@@ -141,16 +136,13 @@ def publish(file_path):
         except json.JSONDecodeError:
             print("Error reading the JSON file. Overwriting with a new list.")
 
-    # Check if the hashinfo already exists and update the entry if found
     for i, entry in enumerate(existing_data):
         if entry.get("hashinfo") == new_data["hashinfo"] and entry.get("peer_port") == new_data["peer_port"]:
-            existing_data[i] = new_data  # Replace the old entry with the new one
+            existing_data[i] = new_data 
             break
     else:
-        # If no matching hashinfo, append the new data
         existing_data.append(new_data)
 
-    # Write the updated data back to the JSON file
     with open(database_path, 'w') as f:
         json.dump(existing_data, f, indent=4)
 
@@ -164,7 +156,7 @@ def fetch(infohash):
     if os.path.exists(database_path):
         try:
             with open(database_path, 'r') as f:
-                tracker_server_database_data = json.load(f)  # Load all JSON data
+                tracker_server_database_data = json.load(f)
         except json.JSONDecodeError:
             print("Error: The JSON file is not properly formatted.")
         except Exception as e:
@@ -375,7 +367,7 @@ def process_input(cmd):
     elif(params[0] == 'fetch'):
         fetch(params[1])
     elif(params[0] == 'download'):
-        info_hashes = params[1:]  # Accept multiple hashes
+        info_hashes = params[1:] 
         for info_hash in info_hashes:
             download(info_hash)
             
