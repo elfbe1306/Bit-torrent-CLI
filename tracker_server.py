@@ -6,7 +6,18 @@ import os
 import time
 from pymongo import MongoClient
 
-HOST = socket.gethostbyname(socket.gethostname())
+def get_real_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Attempt to connect to an external server
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
+
+
+HOST = get_real_ip()
 PORT = 5000
 
 def start_peer_server(peer_ip=socket.gethostbyname(socket.gethostname()), peer_port=5000):
@@ -65,11 +76,11 @@ def get_peers_keep_file(info_hash):
     Fetches peer details for a specific info_hash from MongoDB and displays the information in a table format.
     """
     # MongoDB connection URI
-    uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
+    uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
     
     try:
         # Connect to MongoDB
-        client = MongoClient(uri)
+        client = MongoClient(uri, tlsAllowInvalidCertificates=True)
         print("Connected successfully!")
         
         # Access the database and collection
