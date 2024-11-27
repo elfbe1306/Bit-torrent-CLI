@@ -28,8 +28,8 @@ HOST = get_real_ip()
 PORT = 4002
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
-# PIECE_SIZE = 1024 * 16
-PIECE_SIZE = 32
+PIECE_SIZE = 1024 * 32
+# PIECE_SIZE = 32
 
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
 try:
