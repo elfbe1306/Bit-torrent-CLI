@@ -15,7 +15,7 @@ HOST = socket.gethostbyname(socket.gethostname())
 PORT = 4003
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
-PIECE_SIZE = 2
+PIECE_SIZE = 1024
 
 # uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.gnhrfvo.mongodb.net/"
@@ -33,7 +33,7 @@ except Exception as e:
 # Do not close the client here. Keep it open for the lifetime of the program.
 # Remove the `finally` block entirely.
 
-def start_peer_server(peer_ip = "127.0.0.1", peer_port = "4001"):
+def start_peer_server(peer_ip, peer_port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((peer_ip, peer_port))
         server_socket.listen(5)
