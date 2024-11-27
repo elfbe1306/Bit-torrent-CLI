@@ -14,10 +14,11 @@ import base64
 import struct
 
 HOST = socket.gethostbyname(socket.gethostname())
-PORT = 4000
+PORT = 4001
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
-PIECE_SIZE = 1024 * 16
+# PIECE_SIZE = 1024 * 16
+PIECE_SIZE = 32
 
 # uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.gnhrfvo.mongodb.net/"
