@@ -13,17 +13,27 @@ from pymongo import MongoClient
 import base64
 import struct
 
-HOST = socket.gethostbyname(socket.gethostname())
+def get_real_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Attempt to connect to an external server
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
+
+
+HOST = get_real_ip()
 PORT = 4004
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
 # PIECE_SIZE = 1024 * 16
 PIECE_SIZE = 32
 
-# uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
 try:
-    client = MongoClient(uri)
+    client = MongoClient(uri, tlsAllowInvalidCertificates=True)
     print("Connected successfully!")
     
     db = client["mydatabase"]

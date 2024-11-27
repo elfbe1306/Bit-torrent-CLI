@@ -25,7 +25,7 @@ def get_real_ip():
 
 
 HOST = get_real_ip()
-PORT = 4001
+PORT = 4003
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
 # PIECE_SIZE = 1024 * 16
