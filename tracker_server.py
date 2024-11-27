@@ -9,7 +9,6 @@ from pymongo import MongoClient
 def get_real_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Attempt to connect to an external server
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
     finally:
@@ -19,6 +18,18 @@ def get_real_ip():
 
 HOST = get_real_ip()
 PORT = 5000
+
+uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
+try:
+    client = MongoClient(uri, tlsAllowInvalidCertificates=True)
+    print("Connected successfully!")
+    
+    db = client["mydatabase"]
+    collection = db["mycollection"]
+    
+except Exception as e:
+    print("Error:", e)
+    client = None
 
 def start_peer_server(peer_ip=socket.gethostbyname(socket.gethostname()), peer_port=5000):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -72,32 +83,36 @@ def ping_client(peer_ip, peer_port):
         print('Client is not working')
 
 def get_peers_keep_file(info_hash):
-    """
-    Fetches peer details for a specific info_hash from MongoDB and displays the information in a table format.
-    """
-    # MongoDB connection URI
-    uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
-    
-    try:
-        # Connect to MongoDB
-        client = MongoClient(uri, tlsAllowInvalidCertificates=True)
-        print("Connected successfully!")
+    tracker_server_database_data = list(collection.find({"hashinfo": info_hash}))
+
+    table = PrettyTable()
+    table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
+
+    found_matched_hash_info = False
+
+    for entry in tracker_server_database_data:
+        found_matched_hash_info = True
+        table.add_row([
+            entry.get("hashinfo", "N/A"),
+            entry.get("file_name", "N/A"),
+            entry.get("file_size", "N/A"),
+            entry.get("peer_ip", "N/A"),
+            entry.get("peer_port", "N/A")
+        ])
+
+    if found_matched_hash_info:
+        print(table)
+    else:
+        print(f"No entries found for infohash: {info_hash}")
         
-        # Access the database and collection
-        db = client["mydatabase"]
-        collection = db["mycollection"]
+def discover_all():
+    all_files_data = list(collection.find())
 
-        # Query MongoDB for documents matching the info_hash
-        tracker_server_database_data = list(collection.find({"hashinfo": info_hash}))
+    table = PrettyTable()
+    table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
 
-        # Prepare a table to display results
-        table = PrettyTable()
-        table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
-
-        found_matched_hash_info = False
-
-        for entry in tracker_server_database_data:
-            found_matched_hash_info = True
+    if all_files_data:
+        for entry in all_files_data:
             table.add_row([
                 entry.get("hashinfo", "N/A"),
                 entry.get("file_name", "N/A"),
@@ -105,17 +120,9 @@ def get_peers_keep_file(info_hash):
                 entry.get("peer_ip", "N/A"),
                 entry.get("peer_port", "N/A")
             ])
-
-        if found_matched_hash_info:
-            print(table)
-        else:
-            print(f"No entries found for infohash: {info_hash}")
-
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        # Close the MongoDB connection
-        client.close()
+        print(table)
+    else:
+        print("No files found in the tracker server.")
 
 def process_input(cmd):
     params = cmd.split()
@@ -123,8 +130,11 @@ def process_input(cmd):
         ping_client(params[1], params[2])
         
     elif(params[0] == 'discover'):
-        get_peers_keep_file(params[1])
-        
+        if len(params) > 1:
+            get_peers_keep_file(params[1])
+        else:
+            discover_all()
+          
     else:
         print('Invalid command')
 
