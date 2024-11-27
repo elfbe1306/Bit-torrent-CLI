@@ -31,10 +31,7 @@ try:
     
 except Exception as e:
     print("Error:", e)
-    client = None  # Mark the client as None to handle errors gracefully later
-
-# Do not close the client here. Keep it open for the lifetime of the program.
-# Remove the `finally` block entirely.
+    client = None
 
 def start_peer_server(peer_ip, peer_port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -58,7 +55,6 @@ def handle_request(client_socket):
             info_hash = request['info_hash']
             pieces_status = request['pieces_status']
 
-            # Update `pieces_status.json`
             try:
                 with open('pieces_status.json', 'r') as f:
                     file_status_data = json.load(f)
@@ -69,7 +65,6 @@ def handle_request(client_socket):
                 file_status_data[info_hash] = {}
 
             if 'file_name' not in file_status_data[info_hash]:
-                # If `file_name` is missing, fetch from DB or request sender to provide it
                 file_name = collection.find_one({"hashinfo": info_hash}).get("file_name", "Unknown")
                 file_status_data[info_hash]['file_name'] = file_name
 
@@ -121,7 +116,7 @@ def handle_request(client_socket):
                 data = json.load(f)
 
             if not data.get(info_hash):
-                client_socket.sendall(struct.pack('!I', 0))  # Send length 0 for error
+                client_socket.sendall(struct.pack('!I', 0))
                 return
 
             file_name = f"storage/{data[info_hash]['file_name']}"
@@ -135,14 +130,13 @@ def handle_request(client_socket):
                         chunk_data.append(base64.b64encode(data).decode('utf-8'))
             except FileNotFoundError:
                 print(f"File {file_name} does not exist.")
-                client_socket.sendall(struct.pack('!I', 0))  # Send length 0 for error
+                client_socket.sendall(struct.pack('!I', 0))
                 return
 
             response['chunk_data'] = chunk_data
             json_data = json.dumps(response).encode(FORMAT)
 
-            # Send length-prefixed data
-            client_socket.sendall(struct.pack('!I', len(json_data)))  # Length of JSON
+            client_socket.sendall(struct.pack('!I', len(json_data)))
             client_socket.sendall(json_data)
         elif request['type'] == 'PING':
             response = {
@@ -153,20 +147,17 @@ def handle_request(client_socket):
 def publish(file_path):
     try:
         with open(file_path, 'rb') as file:
-            content = file.read(999999999)  # Read only the first 64KB of the file
+            content = file.read(999999999)
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return
 
-    # Calculate hash
     hash_func = hashlib.sha256()
     hash_func.update(content)
 
-    # Get file details
     file_name = os.path.basename(file_path)
     file_size = os.path.getsize(file_path)
 
-    # Prepare the data to save in MongoDB
     new_data = {
         "hashinfo": hash_func.hexdigest(),
         "file_name": file_name,
@@ -175,16 +166,13 @@ def publish(file_path):
         "peer_port": PORT
     }
 
-    # Check if a document with the same hashinfo and peer_port exists
     query = {"hashinfo": new_data["hashinfo"], "peer_port": new_data["peer_port"]}
     existing_doc = collection.find_one(query)
 
     if existing_doc:
-        # Update the existing document
         result = collection.update_one(query, {"$set": new_data})
         print(f"Updated existing document for file: {file_name}")
     else:
-        # Insert a new document
         result = collection.insert_one(new_data)
         print(f"Inserted new document for file: {file_name} with ID: {result.inserted_id}")
 
@@ -194,7 +182,6 @@ def publish(file_path):
 def fetch(infohash):
     tracker_server_database_data = list(collection.find({"hashinfo": infohash}))
 
-    # Initialize PrettyTable
     table = PrettyTable()
     table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
 
@@ -211,34 +198,45 @@ def fetch(infohash):
     else:
         print(f"No entries found for infohash: {infohash}")
         
-def assign_piece_status_to_peers(info_hash, num_of_pieces, peers_keep_file, file_name):
-    """
-    Dynamically assign pieces_status to peers via socket connections and include the file_name.
-    """
-    peer_chunk_map = {i: [] for i in range(num_of_pieces)}  # Map chunks to peers
+def fetch_all():
+    all_files_data = list(collection.find())
 
-    # Distribute chunks to peers
+    table = PrettyTable()
+    table.field_names = ["Hash Info", "File Name", "File Size", "Peer IP", "Peer Port"]
+
+    if all_files_data:
+        for entry in all_files_data:
+            table.add_row([
+                entry.get("hashinfo", "N/A"),
+                entry.get("file_name", "N/A"),
+                entry.get("file_size", "N/A"),
+                entry.get("peer_ip", "N/A"),
+                entry.get("peer_port", "N/A")
+            ])
+        print(table)
+    else:
+        print("No files found in the tracker server.")
+        
+def assign_piece_status_to_peers(info_hash, num_of_pieces, peers_keep_file, file_name):
+    peer_chunk_map = {i: [] for i in range(num_of_pieces)} 
+
     for i, (peer_ip, peer_port) in enumerate(peers_keep_file):
         for j in range(i, num_of_pieces, len(peers_keep_file)):
             peer_chunk_map[j].append((peer_ip, peer_port))
 
-    # Connect to peers and update their pieces_status
     for peer_ip, peer_port in peers_keep_file:
         pieces_status = [0] * num_of_pieces
 
-        # Determine the chunks assigned to this peer
         for chunk_index, peers in peer_chunk_map.items():
             if (peer_ip, peer_port) in peers:
                 pieces_status[chunk_index] = 1
 
-        # Prepare request for peer
         request = {
             'type': 'UPDATE_PIECES_STATUS',
             'info_hash': info_hash,
             'pieces_status': pieces_status
         }
 
-        # Connect to peer via socket and send the pieces_status
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((peer_ip, int(peer_port)))
@@ -251,7 +249,6 @@ def assign_piece_status_to_peers(info_hash, num_of_pieces, peers_keep_file, file
         except (socket.error, ConnectionRefusedError, TimeoutError) as e:
             print(f"Connection error with peer {peer_ip}:{peer_port}: {e}")
 
-    # Save the updated `pieces_status` and `file_name` to `pieces_status.json`
     try:
         with open('pieces_status.json', 'r') as f:
             file_status_data = json.load(f)
@@ -264,7 +261,6 @@ def assign_piece_status_to_peers(info_hash, num_of_pieces, peers_keep_file, file
             'pieces_status': [0] * num_of_pieces
         }
 
-    # Update the pieces_status for this info_hash
     for peer_ip, peer_port in peers_keep_file:
         pieces_status = [0] * num_of_pieces
         for chunk_index, peers in peer_chunk_map.items():
@@ -317,14 +313,12 @@ def connect_to_peer_and_download_file_chunk(peer_ip, peer_port, info_hash, chunk
 
         s.send(json.dumps(request).encode(FORMAT))
 
-        # Receive the length of the incoming JSON data
         data_length = struct.unpack('!I', s.recv(4))[0]
 
-        if data_length == 0:  # Error case
+        if data_length == 0:
             print(f"Peer {peer_ip}:{peer_port} returned no data for chunks.")
             return
 
-        # Read the full JSON response
         response_data = b""
         while len(response_data) < data_length:
             packet = s.recv(4096)
@@ -340,7 +334,6 @@ def connect_to_peer_and_download_file_chunk(peer_ip, peer_port, info_hash, chunk
             with open(file_path, "r+b") as f:
                 for i, chunk in enumerate(chunk_data):
                     f.seek(chunk_list[i] * PIECE_SIZE)
-                    # Decode Base64 data
                     f.write(base64.b64decode(chunk))
                     print(f"Chunk {chunk_list[i]} has been written into file")
         else:
@@ -353,7 +346,6 @@ def download(info_hash):
 
     data = list(collection.find({"hashinfo": info_hash}))
 
-    # Process the results
     for entry in data:
         peers_keep_file.append((entry.get("peer_ip", "N/A"), entry.get("peer_port", "N/A")))
         if not file_name:
@@ -480,7 +472,10 @@ def process_input(cmd):
     if(params[0] == 'publish'):
         publish(params[1])
     elif(params[0] == 'fetch'):
-        fetch(params[1])
+        if len(params) > 1:
+            fetch(params[1])
+        else:
+            fetch_all()
     elif(params[0] == 'download'):
         info_hashes = params[1:] 
         for info_hash in info_hashes:
