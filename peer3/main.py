@@ -21,7 +21,7 @@ DISCONNECT_MESSAGE = "!Disconnected"
 PIECE_SIZE = 32
 
 # uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
-uri = "mongodb+srv://elfbe:elfbe123@cluster0.gnhrfvo.mongodb.net/"
+uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
 try:
     client = MongoClient(uri)
     print("Connected successfully!")
