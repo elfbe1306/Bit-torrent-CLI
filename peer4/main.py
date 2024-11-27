@@ -10,12 +10,14 @@ from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 import random
 from pymongo import MongoClient
+import base64
+import struct
 
 HOST = socket.gethostbyname(socket.gethostname())
 PORT = 4003
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!Disconnected"
-PIECE_SIZE = 1024
+PIECE_SIZE = 1024 * 16
 
 # uri = "mongodb+srv://tuduong05042003:TCNvGWABP04DAkBZ@natours-app-cluster.us9ca.mongodb.net/"
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.gnhrfvo.mongodb.net/"
@@ -117,9 +119,10 @@ def handle_request(client_socket):
             with open('pieces_status.json', 'r') as f:
                 data = json.load(f)
 
-            if not data[info_hash]:
-                client_socket.send(json.dumps(response).encode('utf-8'))
+            if not data.get(info_hash):
+                client_socket.sendall(struct.pack('!I', 0))  # Send length 0 for error
                 return
+
             file_name = f"storage/{data[info_hash]['file_name']}"
             
             try:
@@ -127,15 +130,19 @@ def handle_request(client_socket):
                     for chunk_index in chunk_list:
                         f.seek(chunk_index * PIECE_SIZE)
                         data = f.read(PIECE_SIZE)
-                        chunk_data.append(data.decode('latin1'))
+                        # Base64 encode binary data
+                        chunk_data.append(base64.b64encode(data).decode('utf-8'))
             except FileNotFoundError:
-                print(f"File {file_name} does not exit.")
-                client_socket.send(json.dumps(response).encode('utf-8'))
+                print(f"File {file_name} does not exist.")
+                client_socket.sendall(struct.pack('!I', 0))  # Send length 0 for error
                 return
-            
-            response['chunk_data'] = chunk_data
 
-            client_socket.send(json.dumps(response).encode('utf-8'))
+            response['chunk_data'] = chunk_data
+            json_data = json.dumps(response).encode(FORMAT)
+
+            # Send length-prefixed data
+            client_socket.sendall(struct.pack('!I', len(json_data)))  # Length of JSON
+            client_socket.sendall(json_data)
         elif request['type'] == 'PING':
             response = {
                 'type': 'PONG'
@@ -143,10 +150,9 @@ def handle_request(client_socket):
             client_socket.sendall(json.dumps(response).encode('utf-8'))
 
 def publish(file_path):
-    print(file_path)
     try:
         with open(file_path, 'rb') as file:
-            content = file.read(65536)  # Read only the first 64KB of the file
+            content = file.read(999999999)  # Read only the first 64KB of the file
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return
@@ -308,20 +314,36 @@ def connect_to_peer_and_download_file_chunk(peer_ip, peer_port, info_hash, chunk
             'chunk_list': chunk_list
         }
 
-        s.send(json.dumps(request).encode('utf-8'))
-        
-        response_data = s.recv(4096)
-        response = json.loads(response_data.decode('utf-8'))
+        s.send(json.dumps(request).encode(FORMAT))
+
+        # Receive the length of the incoming JSON data
+        data_length = struct.unpack('!I', s.recv(4))[0]
+
+        if data_length == 0:  # Error case
+            print(f"Peer {peer_ip}:{peer_port} returned no data for chunks.")
+            return
+
+        # Read the full JSON response
+        response_data = b""
+        while len(response_data) < data_length:
+            packet = s.recv(4096)
+            if not packet:
+                break
+            response_data += packet
+
+        response = json.loads(response_data.decode(FORMAT))
+
         if response['type'] == 'FILE_CHUNK' and response['info_hash'] == info_hash:
             chunk_data = response['chunk_data']
-            
-            with open(file_path, "r+b") as f:  
+
+            with open(file_path, "r+b") as f:
                 for i, chunk in enumerate(chunk_data):
                     f.seek(chunk_list[i] * PIECE_SIZE)
-                    f.write(chunk.encode('latin1'))
+                    # Decode Base64 data
+                    f.write(base64.b64decode(chunk))
                     print(f"Chunk {chunk_list[i]} has been written into file")
         else:
-            print("Has been received invalid response from peer")
+            print("Received invalid response from peer")
 
 def download(info_hash):
     peers_keep_file = []
