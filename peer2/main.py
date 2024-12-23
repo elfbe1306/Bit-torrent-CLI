@@ -31,6 +31,9 @@ DISCONNECT_MESSAGE = "!Disconnected"
 PIECE_SIZE = 1024 * 32
 # PIECE_SIZE = 32
 
+HOSTNGROK = "0.tcp.ap.ngrok.io"
+PORTNROK = 19204
+
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
 try:
     client = MongoClient(uri, tlsAllowInvalidCertificates=True)
@@ -172,8 +175,8 @@ def publish(file_path):
         "hashinfo": hash_func.hexdigest(),
         "file_name": file_name,
         "file_size": file_size,
-        "peer_ip": HOST,
-        "peer_port": PORT
+        "peer_ip": HOSTNGROK,
+        "peer_port": PORTNROK
     }
 
     query = {"hashinfo": new_data["hashinfo"], "peer_port": new_data["peer_port"]}
