@@ -175,8 +175,8 @@ def publish(file_path):
         "hashinfo": hash_func.hexdigest(),
         "file_name": file_name,
         "file_size": file_size,
-        "peer_ip": HOSTNGROK,
-        "peer_port": PORTNROK
+        "peer_ip": HOST,
+        "peer_port": PORT
     }
 
     query = {"hashinfo": new_data["hashinfo"], "peer_port": new_data["peer_port"]}
