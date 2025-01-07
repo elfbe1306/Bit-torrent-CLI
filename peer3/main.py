@@ -31,8 +31,8 @@ DISCONNECT_MESSAGE = "!Disconnected"
 PIECE_SIZE = 1024 * 32
 # PIECE_SIZE = 32
 
-HOSTNGROK = "0.tcp.ap.ngrok.io"
-PORTNROK = 10208
+# HOSTNGROK = "0.tcp.ap.ngrok.io"
+# PORTNROK = 10208
 
 uri = "mongodb+srv://elfbe:elfbe123@cluster0.amkp2.mongodb.net/"
 try:

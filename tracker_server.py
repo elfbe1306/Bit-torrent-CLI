@@ -63,7 +63,6 @@ def ping_client(peer_ip, peer_port):
     try:
         peer_port = int(peer_port)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            
             s.connect((peer_ip, peer_port))
             print(f"Connected to {peer_ip}:{peer_port}")
             
@@ -74,13 +73,19 @@ def ping_client(peer_ip, peer_port):
             s.sendall(json.dumps(request).encode('utf-8'))
             
             response_data = s.recv(4096)
+            if not response_data:
+                print('Client is not working (no response received)')
+                return
+            
             response = json.loads(response_data.decode('utf-8'))
-            if response['type'] == 'PONG':
+            if response.get('type') == 'PONG':
                 print('Client is working')
             else:
-                print('Client is not working')
+                print('Client is not working (invalid response)')
     except (socket.error, ConnectionRefusedError, TimeoutError) as e:
-        print('Client is not working')
+        print('Client is not working (connection error)')
+    except json.JSONDecodeError as e:
+        print('Client is not working (invalid JSON response)')
 
 def get_peers_keep_file(info_hash):
     tracker_server_database_data = list(collection.find({"hashinfo": info_hash}))
